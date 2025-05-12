@@ -4,7 +4,7 @@ from collections import Counter
 import rpyc
 
 # Read book text
-with open("book.txt", "r") as f:
+with open("data/sample.txt", "r") as f:
     book_text = f.read()
 
 
