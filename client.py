@@ -1,4 +1,3 @@
-# master_node.py
 from collections import Counter
 
 import rpyc
@@ -30,11 +29,10 @@ for port, chunk in zip(slave_ports, chunks):
     word_counts = conn.root.count_words(chunk)
     print(type(word_counts))  # <netref class 'rpyc.core.netref.builtins.dict'>
 
-    print(word_counts.items())
+    word_counts = obtain(word_counts)
+    print(type(word_counts))  # Should now print <class 'dict'>
 
-    # results.append(obtain(word_counts)) # typcase to dic
-
-    # results.append(word_counts)
+    results.append(word_counts)
 
 final_counts = Counter()
 for r in results:
