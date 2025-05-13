@@ -4,8 +4,17 @@ import rpyc
 from rpyc.utils.classic import obtain
 
 # Read book text
-with open("data/sample.txt", "r") as f:
-    book_text = f.read()
+try:
+    with open("data/sample.txt", "r") as f:
+        book_text = f.read()
+except FileNotFoundError:
+    print("[ERROR] File 'data/sample.txt' not found.")
+    exit(1)
+except UnicodeDecodeError:
+    print(
+        f"Error: Unable to decode file 'data/sample.txt'. Try specifying the correct encoding."
+    )
+    exit(1)
 
 
 def split_text(text, num_chunks):
@@ -27,10 +36,11 @@ for port, chunk in zip(slave_ports, chunks):
     conn = rpyc.connect("localhost", port)
     print(f"Connected to slave on port {port}")
     word_counts = conn.root.count_words(chunk)
-    print(type(word_counts))  # <netref class 'rpyc.core.netref.builtins.dict'>
+    # print(type(word_counts))   <netref class 'rpyc.core.netref.builtins.dict'>
 
+    # typecast into dictionary
     word_counts = obtain(word_counts)
-    print(type(word_counts))  # Should now print <class 'dict'>
+    # print(type(word_counts))  # Should now print <class 'dict'>
 
     results.append(word_counts)
 
