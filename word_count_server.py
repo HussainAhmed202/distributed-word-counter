@@ -16,6 +16,9 @@ if __name__ == "__main__":
     from rpyc.utils.server import ThreadedServer
 
     port = int(sys.argv[1])  # Pass port as argument
-    server = ThreadedServer(WordCountService, port=port)
+    server = ThreadedServer(
+        WordCountService, port=port, protocol_config={"allow_pickle": True}
+    )
+
     print(f"Slave running on port {port}")
     server.start()
