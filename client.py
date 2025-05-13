@@ -54,7 +54,7 @@ def split_text(text, num_chunks):
     return chunks
 
 
-def connect_to_slave(port, retries=3, retry_delay=2):
+def connect_to_slave(port, retries=3, retry_delay=10):
     """Connect to a slave with retry logic"""
     for attempt in range(retries):
         try:
@@ -110,6 +110,23 @@ def process_chunk(port, chunk):
         return Counter()  # Return empty counter on failure
 
 
+def reduce(results: list[dict]) -> Counter:
+    # aggregate result
+    final_counts = Counter()
+    for r in results:
+        final_counts.update(r)
+    return final_counts
+
+
+def display_results(results: dict) -> None:
+    # aggregate result
+    print(f"\nProcessed {sum(results.values())} words across {len(results)} slaves")
+    print("\nTop 10 most common words:")
+    print("-" * 30)
+    for word, count in results.most_common(10):
+        print(f"{word}: {count}")
+
+
 def main():
     # Configuration
     input_file = "data/sample.txt"
@@ -127,7 +144,7 @@ def main():
     print(f"Split text into {len(chunks)} chunks")
 
     # Connect and send tasks
-    results = []
+    results: list[dict] = []
     for port, chunk in zip(slave_ports, chunks):
         try:
             word_counts = process_chunk(port, chunk)
@@ -144,17 +161,18 @@ def main():
         print("Error: No results collected from any slaves.")
         return
 
-    final_counts = Counter()
-    for r in results:
-        final_counts.update(r)
+    # aggregate result
+    final_counts = reduce(results)
 
-    print(
-        f"\nProcessed {sum(final_counts.values())} words across {len(results)} slaves"
-    )
-    print("\nTop 10 most common words:")
-    print("-" * 30)
-    for word, count in final_counts.most_common(10):
-        print(f"{word}: {count}")
+    display_results(final_counts)
+
+    # print(
+    #     f"\nProcessed {sum(final_counts.values())} words across {len(results)} slaves"
+    # )
+    # print("\nTop 10 most common words:")
+    # print("-" * 30)
+    # for word, count in final_counts.most_common(10):
+    #     print(f"{word}: {count}")
 
 
 if __name__ == "__main__":
