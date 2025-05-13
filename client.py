@@ -1,51 +1,161 @@
+import os
+import sys
+import time
 from collections import Counter
 
 import rpyc
 from rpyc.utils.classic import obtain
 
-# Read book text
-try:
-    with open("data/sample.txt", "r") as f:
-        book_text = f.read()
-except FileNotFoundError:
-    print("[ERROR] File 'data/sample.txt' not found.")
-    exit(1)
-except UnicodeDecodeError:
-    print(
-        f"Error: Unable to decode file 'data/sample.txt'. Try specifying the correct encoding."
-    )
-    exit(1)
+
+def load_text(filepath):
+    """Load text from file with error handling"""
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        sys.exit(1)
+    # except PermissionError:
+    #     print(f"Error: Permission denied when trying to read '{filepath}'.")
+    #     sys.exit(1)
+    except UnicodeDecodeError:
+        print(
+            f"Error: Unable to decode file '{filepath}'. Try specifying the correct encoding."
+        )
+        sys.exit(1)
+    except IOError as e:
+        print(f"Error reading file: {str(e)}")
+        return
+    # except Exception as e:
+    #     print(f"Unexpected error reading file: {str(e)}")
+    #     sys.exit(1)
 
 
 def split_text(text, num_chunks):
+    """Split text into approximately equal chunks"""
     words = text.split()
-    chunk_size = len(words) // num_chunks
-    return [
-        " ".join(words[i * chunk_size : (i + 1) * chunk_size])
-        for i in range(num_chunks)
-    ]
+
+    # Handle case where there are fewer words than chunks
+    if len(words) < num_chunks:
+        print(
+            f"Warning: Text has fewer words ({len(words)}) than requested chunks ({num_chunks})."
+        )
+        num_chunks = min(len(words), num_chunks)
+
+    chunk_size = max(1, len(words) // num_chunks)
+    chunks = []
+
+    for i in range(num_chunks - 1):
+        chunks.append(" ".join(words[i * chunk_size : (i + 1) * chunk_size]))
+
+    # Last chunk gets any remaining words
+    chunks.append(" ".join(words[(num_chunks - 1) * chunk_size :]))
+
+    return chunks
 
 
-# Define local slave ports
-slave_ports = [18861, 18862, 18863]
-chunks = split_text(book_text, len(slave_ports))
+def connect_to_slave(port, retries=3, retry_delay=2):
+    """Connect to a slave with retry logic"""
+    for attempt in range(retries):
+        try:
+            conn = rpyc.connect("localhost", port, config={"sync_request_timeout": 30})
+            print(f"Connected to slave on port {port}")
+            return conn
+        except ConnectionRefusedError:
+            print(
+                f"Connection refused to slave on port {port}. Is the server running? Attempt {attempt+1}/{retries}"
+            )
+            if attempt < retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                print(
+                    f"Failed to connect to slave on port {port} after {retries} attempts."
+                )
+                raise
+        except Exception as e:
+            print(f"Unexpected error connecting to port {port}: {str(e)}")
+            raise
 
-# Connect and send tasks
-results = []
-for port, chunk in zip(slave_ports, chunks):
-    conn = rpyc.connect("localhost", port)
-    print(f"Connected to slave on port {port}")
-    word_counts = conn.root.count_words(chunk)
-    # print(type(word_counts))   <netref class 'rpyc.core.netref.builtins.dict'>
 
-    # typecast into dictionary
-    word_counts = obtain(word_counts)
-    # print(type(word_counts))  # Should now print <class 'dict'>
+def process_chunk(port, chunk):
+    """Process a text chunk on a specific slave"""
+    try:
+        conn = connect_to_slave(port)
 
-    results.append(word_counts)
+        try:
+            # Get word counts from remote service
+            word_counts = conn.root.count_words(chunk)
 
-final_counts = Counter()
-for r in results:
-    final_counts.update(r)
+            # Convert netref object to local object
+            try:
+                word_counts = obtain(word_counts)
+                return word_counts
+            except Exception as e:
+                print(f"Error obtaining result from port {port}: {str(e)}")
+                raise
 
-print(final_counts.most_common(10))
+        except rpyc.core.protocol.PingError:
+            print(f"Connection lost to slave on port {port} during processing")
+            raise
+        except Exception as e:
+            print(f"Error during remote processing on port {port}: {str(e)}")
+            raise
+        finally:
+            # Always try to close the connection
+            conn.close()
+
+    except Exception as e:
+        print(f"Failed to process chunk on port {port}: {str(e)}")
+        return Counter()  # Return empty counter on failure
+
+
+def main():
+    # Configuration
+    input_file = "data/sample.txt"
+    slave_ports = [18861, 18862, 18863]
+
+    # Load text
+    try:
+        book_text = load_text(input_file)
+        print(f"Successfully loaded text from {input_file}")
+    except SystemExit:
+        return  # Exit if file loading failed
+
+    # Split text into chunks
+    chunks = split_text(book_text, len(slave_ports))
+    print(f"Split text into {len(chunks)} chunks")
+
+    # Connect and send tasks
+    results = []
+    for port, chunk in zip(slave_ports, chunks):
+        try:
+            word_counts = process_chunk(port, chunk)
+            if word_counts:
+                results.append(word_counts)
+                print(f"Successfully processed chunk on port {port}")
+            else:
+                print(f"No results from slave on port {port}")
+        except Exception as e:
+            print(f"Failed to process on port {port}: {e}")
+
+    # Combine results
+    if not results:
+        print("Error: No results collected from any slaves.")
+        return
+
+    final_counts = Counter()
+    for r in results:
+        final_counts.update(r)
+
+    print(
+        f"\nProcessed {sum(final_counts.values())} words across {len(results)} slaves"
+    )
+    print("\nTop 10 most common words:")
+    print("-" * 30)
+    for word, count in final_counts.most_common(10):
+        print(f"{word}: {count}")
+
+
+if __name__ == "__main__":
+    main()
