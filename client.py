@@ -127,7 +127,7 @@ def display_results(results: dict) -> None:
         print(f"{word}: {count}")
 
 
-def main():
+if __name__ == "__main__":
     # Configuration
     input_file = "data/sample.txt"
     slave_ports = [18861, 18862, 18863]
@@ -137,7 +137,7 @@ def main():
         book_text = load_text(input_file)
         print(f"Successfully loaded text from {input_file}")
     except SystemExit:
-        return  # Exit if file loading failed
+        sys.exit(1)  # Exit if file loading failed
 
     # Split text into chunks
     chunks = split_text(book_text, len(slave_ports))
@@ -159,21 +159,9 @@ def main():
     # Combine results
     if not results:
         print("Error: No results collected from any slaves.")
-        return
+        sys.exit(1)
 
     # aggregate result
     final_counts = reduce(results)
 
     display_results(final_counts)
-
-    # print(
-    #     f"\nProcessed {sum(final_counts.values())} words across {len(results)} slaves"
-    # )
-    # print("\nTop 10 most common words:")
-    # print("-" * 30)
-    # for word, count in final_counts.most_common(10):
-    #     print(f"{word}: {count}")
-
-
-if __name__ == "__main__":
-    main()
