@@ -110,23 +110,6 @@ def process_chunk(host, port, chunk):
         return Counter()  # Return empty counter on failure
 
 
-def reduce(results: list[dict]) -> Counter:
-    # aggregate result
-    final_counts = Counter()
-    for r in results:
-        final_counts.update(r)
-    return final_counts
-
-
-def display_results(results: dict) -> None:
-    # aggregate result
-    print(f"\nProcessed {sum(results.values())} words across {len(results)} slaves")
-    print("\nTop 10 most common words:")
-    print("-" * 30)
-    for word, count in results.most_common(10):
-        print(f"{word}: {count}")
-
-
 if __name__ == "__main__":
     input_file = "data/sample.txt"
 
@@ -167,6 +150,12 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # aggregate result
-    final_counts = reduce(results)
+    final_counts = Counter()
+    for r in results:
+        final_counts.update(r)
 
-    display_results(final_counts)
+    print(f"\nProcessed {sum(results.values())} words across {len(results)} slaves")
+    print("\nTop 10 most common words:")
+    print("-" * 30)
+    for word, count in results.most_common(10):
+        print(f"{word}: {count}")
