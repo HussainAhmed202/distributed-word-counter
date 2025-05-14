@@ -73,6 +73,7 @@ if __name__ == "__main__":
         server = rpyc.utils.server.ThreadedServer(
             WordCountService,
             port=port,
+            hostname="0.0.0.0",
             protocol_config={
                 "allow_pickle": True,
                 "allow_public_attrs": True,

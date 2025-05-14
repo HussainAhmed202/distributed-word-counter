@@ -54,16 +54,16 @@ def split_text(text, num_chunks):
     return chunks
 
 
-def connect_to_slave(port, retries=3, retry_delay=10):
+def connect_to_slave(host, port, retries=3, retry_delay=10):
     """Connect to a slave with retry logic"""
     for attempt in range(retries):
         try:
-            conn = rpyc.connect("localhost", port, config={"sync_request_timeout": 30})
-            print(f"Connected to slave on port {port}")
+            conn = rpyc.connect(host, port, config={"sync_request_timeout": 30})
+            print(f"Connected to slave at {host}:{port}")
             return conn
         except ConnectionRefusedError:
             print(
-                f"Connection refused to slave on port {port}. Is the server running? Attempt {attempt+1}/{retries}"
+                f"Connection refused to slave at {host}:{port}. Is the server running? Attempt {attempt+1}/{retries}"
             )
             if attempt < retries - 1:
                 print(f"Retrying in {retry_delay} seconds...")
@@ -78,10 +78,10 @@ def connect_to_slave(port, retries=3, retry_delay=10):
             raise
 
 
-def process_chunk(port, chunk):
+def process_chunk(host, port, chunk):
     """Process a text chunk on a specific slave"""
     try:
-        conn = connect_to_slave(port)
+        conn = connect_to_slave(host, port)
 
         try:
             # Get word counts from remote service
@@ -127,27 +127,32 @@ def display_results(results: dict) -> None:
         print(f"{word}: {count}")
 
 
-def main():
-    # Configuration
+if __name__ == "__main__":
     input_file = "data/sample.txt"
-    slave_ports = [18861, 18862, 18863]
+
+    # Configuration
+    slave_servers = [
+        ("172.31.35.88", 18861),
+        ("172.31.35.148", 18862),
+        ("172.31.39.162", 18863),
+    ]
 
     # Load text
     try:
         book_text = load_text(input_file)
         print(f"Successfully loaded text from {input_file}")
     except SystemExit:
-        return  # Exit if file loading failed
+        sys.exit(1)  # Exit if file loading failed
 
     # Split text into chunks
-    chunks = split_text(book_text, len(slave_ports))
+    chunks = split_text(book_text, len(slave_servers))
     print(f"Split text into {len(chunks)} chunks")
 
     # Connect and send tasks
     results: list[dict] = []
-    for port, chunk in zip(slave_ports, chunks):
+    for (host, port), chunk in zip(slave_servers, chunks):
         try:
-            word_counts = process_chunk(port, chunk)
+            word_counts = process_chunk(host, port, chunk)
             if word_counts:
                 results.append(word_counts)
                 print(f"Successfully processed chunk on port {port}")
@@ -159,21 +164,9 @@ def main():
     # Combine results
     if not results:
         print("Error: No results collected from any slaves.")
-        return
+        sys.exit(1)
 
     # aggregate result
     final_counts = reduce(results)
 
     display_results(final_counts)
-
-    # print(
-    #     f"\nProcessed {sum(final_counts.values())} words across {len(results)} slaves"
-    # )
-    # print("\nTop 10 most common words:")
-    # print("-" * 30)
-    # for word, count in final_counts.most_common(10):
-    #     print(f"{word}: {count}")
-
-
-if __name__ == "__main__":
-    main()
