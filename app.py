@@ -42,9 +42,9 @@ def process_file():
         (os.getenv("SLAVE3_IP"), int(os.getenv("SLAVE3_PORT"))),
     ]
 
-    print(slave_servers)
+    # print(slave_servers)
 
-    ports = [18861, 18862, 18863]
+    # ports = [18861, 18862, 18863]
     text = ""
 
     # Check if file was uploaded
@@ -78,18 +78,33 @@ def process_file():
         return jsonify({"error": "No valid input provided."}), 400
 
     text = preprocess_text(text)
+
     # Split text into chunks
-    chunks = split_text(text, len(ports))
+    chunks = split_text(text, len(slave_servers))
+
     print(f"Split text into {len(chunks)} chunks")
 
     # # Connect and send tasks
     # results = [process_chunk(port, chunk) for port, chunk in zip(ports, chunks)]
 
+    # # Connect and send tasks
+    # results: list[dict] = []
+    # for port, chunk in zip(ports, chunks):
+    #     try:
+    #         word_counts = process_chunk(port, chunk)
+    #         if word_counts:
+    #             results.append(word_counts)
+    #             print(f"Successfully processed chunk on port {port}")
+    #         else:
+    #             print(f"No results from slave on port {port}")
+    #     except Exception as e:
+    #         print(f"Failed to process on port {port}: {e}")
+
     # Connect and send tasks
     results: list[dict] = []
-    for port, chunk in zip(ports, chunks):
+    for (host, port), chunk in zip(slave_servers, chunks):
         try:
-            word_counts = process_chunk(port, chunk)
+            word_counts = process_chunk(host, port, chunk)
             if word_counts:
                 results.append(word_counts)
                 print(f"Successfully processed chunk on port {port}")
