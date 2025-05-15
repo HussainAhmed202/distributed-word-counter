@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Distributed Word Count</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f9f9f9;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      header {
+        background-color: #4caf50;
+        color: white;
+        width: 100%;
+        padding: 20px 0;
+        text-align: center;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      main {
+        padding: 30px;
+        max-width: 1000px;
+        width: 90%;
+        background-color: white;
+        margin-top: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      }
+
+      h2,
+      h3 {
+        color: #333;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+
+      input[type="file"],
+      textarea {
+        font-size: 16px;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      textarea {
+        resize: vertical;
+      }
+
+      button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 12px;
+        font-size: 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      button:hover {
+        background-color: #45a049;
+      }
+
+      #word-cloud {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 10;
+        border: 1px solid #ccc;
+        display: block;
+        margin: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Distributed Word Count</h1>
+    </header>
+
+    <main>
+      <h2>Upload a .txt or .pdf file <strong>or</strong> type text below:</h2>
+
+      <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".txt,.pdf" />
+        <textarea
+          name="text"
+          rows="6"
+          placeholder="Or paste text here..."
+        ></textarea>
+        <button type="submit">Generate Word Cloud</button>
+      </form>
+
+      <h3>Word Cloud:</h3>
+      <canvas id="word-cloud" width="200" height="200"></canvas>
+    </main>
+
+    <!-- Load wordcloud2.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.2/wordcloud2.min.js"></script>
+
+    <script>
+      document
+        .getElementById("upload-form")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          const form = this;
+          const formData = new FormData(form);
+          const textInput = form.querySelector("textarea").value.trim();
+
+          if (
+            textInput.length > 0 &&
+            !form.querySelector('input[type="file"]').files.length
+          ) {
+            formData.append("text", textInput);
+          }
+
+          const response = await fetch("/process", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            alert("Error: " + (errorData.error || "Unknown error"));
+            return;
+          }
+
+          const result = await response.json();
+          const wordsArray = result.words;
+
+          WordCloud(document.getElementById("word-cloud"), {
+            list: wordsArray,
+            gridSize: 4,
+            weightFactor: (size) => size * 10,
+            fontFamily: "Times, serif",
+            color: "random-dark",
+            rotateRatio: 0.2,
+            rotationSteps: 2,
+            backgroundColor: "#f0f0f0",
+          });
+        });
+    </script>
+  </body>
+</html>
