@@ -123,6 +123,7 @@ def process_file():
     for r in results:
         final_counts.update(r)
 
+    print(f"\nProcessed {sum(results.values())} words across {len(results)} slaves")
     print("\nTop 10 most common words:")
     print("-" * 30)
     # for word, count in results.most_common(10):
